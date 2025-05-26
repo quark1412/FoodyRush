@@ -1,5 +1,4 @@
 import instance from "../services/axiosConfig";
-import Cookies from "js-cookie";
 
 export const getAllCategories = async () => {
   try {

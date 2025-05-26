@@ -1,10 +1,10 @@
-import { useEffect, useState, useMemo, useContext } from "react";
+import { useEffect, useState, useMemo, useContext, memo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthContext from "../context/AuthContext";
 import { Modal } from "flowbite-react";
+import PropTypes from "prop-types";
 
 import { getProductById } from "../data/products";
-// import { getAllImagesByProductId } from "../data/productImages";
 import { getCategoryById } from "../data/categories";
 import { getProductVariantsByProductId } from "../data/productVariant";
 import { formatToVND, formatURL } from "../utils/format";
@@ -17,7 +17,43 @@ import { useDispatch, useSelector } from "react-redux";
 import toast from "react-hot-toast";
 import { addToCart } from "../stores/cart";
 
-function ProductItem({
+// Extract SVG components
+const CartIcon = memo(({ className, stroke }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke={stroke}
+    strokeWidth="2"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+    />
+  </svg>
+));
+
+const MinusIcon = memo(() => (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M5 12H19"
+      stroke="#a93f15"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+));
+
+const ProductItem = memo(function ProductItem({
   id,
   usage,
   productName,
@@ -38,73 +74,75 @@ function ProductItem({
   const [quantity, setQuantity] = useState(1);
   const [imageLoading, setImageLoading] = useState(true);
 
-  const fetchVariants = async () => {
-    const fetchedVariants = await getProductVariantsByProductId(id);
-    if (fetchedVariants) {
-      const variantsData = await Promise.all(
-        fetchedVariants.map(async (variant) => {
-          const size = variant.size;
-          return { size, quantity: variant.stock };
-        })
-      );
-      setSelectedSize(variantsData[0].size);
-      setVariants(variantsData);
-    }
-  };
-
-  useEffect(() => {
-    fetchVariants();
-  }, [id]);
-
-  const handleAddToCart = async () => {
-    const product = {
-      productId: id,
-      name: productName,
-      categoryId: category,
-      price: price,
-      quantity: quantity,
-      size: selectedSize,
-      image,
-    };
-    dispatch(addToCart(product));
-    toast.success("Sản phẩm đã được thêm vào giỏ hàng", { duration: 2000 });
-    setOpenCartModal(false);
-  };
-
-  useEffect(() => {
-    const filteredSizes = variants.map((variant) => variant.size);
-    setAvailableSizes(filteredSizes);
+  // Memoize expensive computations
+  const variantsData = useMemo(() => {
+    return variants.map((variant) => ({
+      size: variant.size,
+      quantity: variant.stock,
+    }));
   }, [variants]);
 
-  const handleCheckout = () => {
-    const subTotal = quantity * price;
-    const shipping =
-      subTotal > FREE_SHIPPING || subTotal === 0 ? 0 : subTotal * SHIPPING_RATE;
-    const totalPrice = subTotal + shipping;
-    const selectedCartItems = [
-      {
+  const handleAddToCart = useMemo(
+    () => async () => {
+      const product = {
         productId: id,
+        name: productName,
+        categoryId: category,
+        price,
+        quantity,
         size: selectedSize,
-        quantity: quantity,
-      },
-    ];
+        image,
+      };
+      dispatch(addToCart(product));
+      toast.success("Sản phẩm đã được thêm vào giỏ hàng", { duration: 2000 });
+      setOpenCartModal(false);
+    },
+    [id, productName, category, price, quantity, selectedSize, image]
+  );
 
-    const orderSummary = {
-      items: selectedCartItems,
-      totalItems: quantity,
-      subTotal: quantity * price,
-      shipping: shipping,
-      totalPrice: totalPrice,
+  const handleCheckout = useMemo(
+    () => () => {
+      setOpenModal(false);
+      const subTotal = quantity * price;
+      const shipping =
+        subTotal > FREE_SHIPPING || subTotal === 0
+          ? 0
+          : subTotal * SHIPPING_RATE;
+      const totalPrice = subTotal + shipping;
+
+      const orderSummary = {
+        items: [{ productId: id, size: selectedSize, quantity }],
+        totalItems: quantity,
+        subTotal,
+        shipping,
+        totalPrice,
+      };
+      navigate("/checkout", { state: { orderSummary, type: "Buy Now" } });
+    },
+    [quantity, price, id, selectedSize, auth.isAuth]
+  );
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchVariants = async () => {
+      try {
+        const fetchedVariants = await getProductVariantsByProductId(id);
+        if (mounted && fetchedVariants) {
+          setVariants(fetchedVariants);
+          setSelectedSize(fetchedVariants[0]?.size);
+          setAvailableSizes(fetchedVariants.map((v) => v.size));
+        }
+      } catch (error) {
+        console.error("Error fetching variants:", error);
+      }
     };
 
-    if (selectedCartItems.length > 0) {
-      if (!auth.isAuth) {
-        navigate("/login", { state: { orderSummary, type: "Buy Now" } });
-      } else {
-        navigate("/checkout", { state: { orderSummary, type: "Buy Now" } });
-      }
-    }
-  };
+    fetchVariants();
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
 
   const handleImageLoad = () => {
     setImageLoading(false);
@@ -150,6 +188,7 @@ function ProductItem({
           <img
             className={`object-cover h-60 w-56`}
             src={image}
+            loading="lazy"
             alt="product image"
             onLoad={handleImageLoad}
             defaultValue={"https://via.placeholder.com/800x600?text=Team+Image"}
@@ -223,20 +262,7 @@ function ProductItem({
               className="flex items-center justify-center rounded-md bg-[#a93f15] px-3 py-2 text-center text-[0.6rem] font-medium text-white hover:bg-[#FF7E4C] focus:outline-none focus:ring-4 focus:ring-blue-300 transition duration-300 ease-in-out ml-3"
               data-product-id={id}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="mr-1 h-4 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="#fff"
-                strokeWidth="2"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
+              <CartIcon className="mr-1 h-4 w-6" stroke="#fff" />
               Giỏ hàng
             </button>
           </div>
@@ -279,21 +305,7 @@ function ProductItem({
                         setQuantity((prev) => Math.max(1, prev - 1))
                       }
                     >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M5 12H19"
-                          stroke="#a93f15"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        />
-                      </svg>
+                      <MinusIcon />
                     </button>
                     <div className="w-px h-6 bg-[#a93f15]"></div>
                     <span className="py-1 text-center flex-1 text-[#a93f15]">
@@ -314,16 +326,16 @@ function ProductItem({
                         <path
                           d="M12 5V19"
                           stroke="#a93f15"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
                         />
                         <path
                           d="M5 12H19"
                           stroke="#a93f15"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
                         />
                       </svg>
                     </button>
@@ -418,21 +430,7 @@ function ProductItem({
                         setQuantity((prev) => Math.max(1, prev - 1))
                       }
                     >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M5 12H19"
-                          stroke="#a93f15"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        />
-                      </svg>
+                      <MinusIcon />
                     </button>
                     <div className="w-px h-6 bg-[#a93f15]"></div>
                     <span className="py-1 text-center flex-1 text-[#a93f15]">
@@ -453,16 +451,16 @@ function ProductItem({
                         <path
                           d="M12 5V19"
                           stroke="#a93f15"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
                         />
                         <path
                           d="M5 12H19"
                           stroke="#a93f15"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
                         />
                       </svg>
                     </button>
@@ -498,20 +496,7 @@ function ProductItem({
               onClick={handleAddToCart}
               className="px-6 py-2 flex items-center gap-x-2 rounded bg-[#a93f15] text-white font-medium"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="mr-1 h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="#fff"
-                strokeWidth="2"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
+              <CartIcon className="mr-1 h-6 w-6" stroke="#fff" />
               Thêm vào giỏ hàng
             </button>
           </div>
@@ -519,6 +504,16 @@ function ProductItem({
       </Modal>
     </>
   );
-}
+});
+
+ProductItem.propTypes = {
+  id: PropTypes.string.isRequired,
+  usage: PropTypes.string,
+  productName: PropTypes.string.isRequired,
+  rating: PropTypes.number,
+  category: PropTypes.string.isRequired,
+  image: PropTypes.string.isRequired,
+  price: PropTypes.number.isRequired,
+};
 
 export default ProductItem;

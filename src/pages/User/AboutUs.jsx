@@ -38,13 +38,13 @@ const AboutUs = () => {
                   Công ty chúng tôi
                 </h1>
                 <p className="text-lg text-gray-600 leading-relaxed">
-                  Được thành lập từ năm 2024, FashionSpace là cửa hàng thời
-                  trang hiện đại, nơi hội tụ những xu hướng mới nhất và phong
-                  cách độc đáo. Chúng tôi cam kết mang đến cho khách hàng những
-                  sản phẩm chất lượng cao, đa dạng và phù hợp với mọi phong
-                  cách. Với sự kết hợp giữa sự sáng tạo và đam mê, chúng tôi
-                  không chỉ bán thời trang mà còn truyền cảm hứng để bạn thể
-                  hiện cá tính riêng qua từng bộ trang phục.
+                  Được thành lập từ năm 2024, FoodyRush là cửa hàng thời trang
+                  hiện đại, nơi hội tụ những xu hướng mới nhất và phong cách độc
+                  đáo. Chúng tôi cam kết mang đến cho khách hàng những sản phẩm
+                  chất lượng cao, đa dạng và phù hợp với mọi phong cách. Với sự
+                  kết hợp giữa sự sáng tạo và đam mê, chúng tôi không chỉ bán
+                  thời trang mà còn truyền cảm hứng để bạn thể hiện cá tính
+                  riêng qua từng bộ trang phục.
                 </p>
               </div>
               <div className="flex-1">

@@ -30,6 +30,7 @@ import { getUserById } from "../../data/users";
 import { jwtDecode } from "jwt-decode";
 import { Modal } from "flowbite-react";
 import { updateOrderAddress } from "../../data/orderAddress";
+import Radio from "../../components/Radio";
 
 const apiUrl = "https://api.mysupership.vn";
 const apiEndpointProvince = apiUrl + "/v1/partner/areas/province";
@@ -464,7 +465,7 @@ function Checkout() {
                       <p>Đường: {selectedUserAddress.street}</p>
                     </div>
                   )}
-                  <div className="flex flex-row gap-5">
+                  <div className="flex flex-row gap-5 mt-2">
                     {!selectedUserAddress && (
                       <button
                         className="bg-[#a93f15] px-6 py-2 rounded-lg text-white font-semibold"
@@ -542,7 +543,11 @@ function Checkout() {
                     )}
                     <button
                       className="bg-[#a93f15] px-6 py-2 rounded-lg text-white font-semibold"
-                      onClick={() => setOpenAddAddressModal(true)}
+                      onClick={() => {
+                        setDistricts([]);
+                        setCommunes([]);
+                        setOpenAddAddressModal(true);
+                      }}
                     >
                       Thêm mới thông tin
                     </button>
@@ -709,11 +714,10 @@ function Checkout() {
               <div className="flex flex-col gap-y-2">
                 {PAYMENT_METHOD.map((method, index) => (
                   <div className="flex flex-row ml-2 items-center" key={index}>
-                    <input
-                      type="radio"
+                    <Radio
+                      value={method.value}
                       checked={paymentMethod === method.value}
                       onChange={() => setPaymentMethod(method.value)}
-                      value={method.value}
                     />
                     <label className="ml-2">{method.title}</label>
                   </div>
@@ -747,15 +751,13 @@ function Checkout() {
             <div className="flex flex-col overflow-scroll max-h-96 gap-5 mb-4 thin-scrollbar">
               {userAddresses.map((userAddress) => (
                 <div className="flex flex-row gap-5 items-start">
-                  <input
-                    type="radio"
+                  <Radio
+                    value={userAddress._id}
                     checked={selectedUserAddress?._id === userAddress._id}
                     onChange={() => {
                       setSelectedUserAddress(userAddress);
                       setOpenSelectAddressModal(false);
                     }}
-                    value={userAddress._id}
-                    className="mt-2 ml-2"
                   />
                   <div className="flex flex-col gap-y-2">
                     <p>Số điện thoại: {userAddress.phone}</p>
